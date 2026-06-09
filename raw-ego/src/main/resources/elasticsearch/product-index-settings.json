@@ -1,0 +1,72 @@
+{
+  "analysis": {
+    "filter": {
+      "edge_ngram_filter": {
+        "type": "edge_ngram",
+        "min_gram": 2,
+        "max_gram": 15
+      },
+      "ego_synonym_filter": {
+        "type": "synonym",
+        "synonyms": [
+          "tee, t-shirt, tshirt",
+          "trousers, pants, bottoms",
+          "sneakers, trainers, kicks, runners",
+          "hoodie, hoody, sweatshirt",
+          "blazer, suit jacket, sports coat",
+          "kurta, kurti",
+          "joggers, sweatpants, track pants, jogging bottoms",
+          "polo, polo shirt, polo neck",
+          "shorts, bermudas, half pants",
+          "denim, jeans, denims",
+          "dress, frock",
+          "skirt, mini skirt, midi skirt, maxi skirt",
+          "coat, overcoat, longcoat",
+          "jacket, biker jacket, puffer jacket",
+          "sweater, pullover, jumper",
+          "vest, tank top, sleeveless top",
+          "leggings, tights, jeggings",
+          "kurti, tunic",
+          "ethnic wear, traditional wear, indian wear",
+          "formal wear, office wear, workwear, business wear",
+          "casual wear, everyday wear",
+          "streetwear, street style",
+          "activewear, sportswear, athleisure",
+          "loungewear, homewear, comfort wear",
+          "oversized fit, baggy, loose fit",
+          "slim fit, skinny fit, fitted",
+          "regular fit, relaxed fit",
+          "crop top, cropped top",
+          "black, noir, dark",
+          "white, blanc, ivory, cream, off-white",
+          "blue, navy, cobalt, royal blue",
+          "red, crimson, scarlet, maroon",
+          "green, olive, khaki, sage",
+          "beige, camel, sand, nude, tan"
+        ]
+      }
+    },
+    "analyzer": {
+      "search_analyzer": {
+        "type": "custom",
+        "tokenizer": "standard",
+        "filter": ["lowercase", "asciifolding"]
+      },
+      "autocomplete_analyzer": {
+        "type": "custom",
+        "tokenizer": "standard",
+        "filter": ["lowercase", "asciifolding", "edge_ngram_filter"]
+      },
+      "autocomplete_search_analyzer": {
+        "type": "custom",
+        "tokenizer": "standard",
+        "filter": ["lowercase", "asciifolding"]
+      },
+      "ego_synonym_analyzer": {
+        "type": "custom",
+        "tokenizer": "standard",
+        "filter": ["lowercase", "asciifolding", "ego_synonym_filter"]
+      }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "properties": {
+    "id":              { "type": "long" },
+    "name": {
+      "type": "text",
+      "analyzer": "autocomplete_analyzer",
+      "search_analyzer": "ego_synonym_analyzer",
+      "fields": {
+        "keyword": { "type": "keyword" }
+      }
+    },
+    "description": {
+      "type": "text",
+      "analyzer": "search_analyzer",
+      "search_analyzer": "ego_synonym_analyzer"
+    },
+    "slug":             { "type": "keyword" },
+    "categoryId":       { "type": "long" },
+    "categoryName":     { "type": "keyword" },
+    "categoryPath":     { "type": "keyword" },
+    "categorySlugPath": { "type": "keyword" },
+    "tags":             { "type": "keyword" },
+    "primaryImageUrl":  { "type": "keyword", "index": false },
+    "availableSizes":   { "type": "keyword" },
+    "availableColors":  { "type": "keyword" },
+    "colorHexCodes":    { "type": "keyword", "index": false },
+    "minPrice":         { "type": "double" },
+    "maxPrice":         { "type": "double" },
+    "totalStock":       { "type": "integer" },
+    "avgRating":        { "type": "float" },
+    "reviewCount":      { "type": "integer" },
+    "isActive":         { "type": "boolean" },
+    "createdAt":        { "type": "date" }
+  }
+}
