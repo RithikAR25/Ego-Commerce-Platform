@@ -100,8 +100,13 @@ const ImageUploader: React.FC<Props> = ({ productId, variantId, nextDisplayOrder
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
           >
-            <CircularProgress size={32} sx={{ mb: 2 }} />
-            <Typography variant="metadata" >Uploading...</Typography>
+            <CircularProgress size={32} sx={{ mb: 2 }} color="primary" />
+            <Typography variant="subtitle2" color="primary.main" sx={{ fontWeight: 'bold' }}>
+              Processing Image...
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              Optimizing for different sizes. This may take up to a minute.
+            </Typography>
           </motion.div>
         ) : (
           <motion.div

@@ -294,7 +294,7 @@ const ProductListingPage: React.FC = () => {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 4, md: 8 } }}>
+    <Container maxWidth={false} sx={{ py: { xs: 4, md: 8 }, px: { xs: 2, md: 6, lg: 10 } }}>
 
       {/* ── Fallback Mode Banner ───────────────────────────────────────────── */}
       {data?.fallbackMode && (

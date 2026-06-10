@@ -85,7 +85,7 @@
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-impl</artifactId>
-			<version>0.12.3</version>
+			<version>0.12.6</version>
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>
@@ -99,6 +99,14 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
+		<!-- ===== CAFFEINE — in-process cache with TTL eviction ===== -->
+		<!-- Used by RateLimitFilter to auto-evict stale IP rate-limit buckets. -->
+		<!-- Spring Boot manages the version via spring-boot-dependencies BOM. -->
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
 		</dependency>
 
 		<!-- ===== SWAGGER / OPENAPI 3 ===== -->

@@ -10,6 +10,7 @@ import com.ego.raw_ego.catalog.entity.CategoryHierarchyLink;
 import com.ego.raw_ego.catalog.repository.CategoryHierarchyLinkRepository;
 import com.ego.raw_ego.catalog.repository.CategoryRepository;
 import com.ego.raw_ego.catalog.repository.ProductRepository;
+import com.ego.raw_ego.common.exception.BusinessRuleViolationException;
 import com.ego.raw_ego.common.exception.ConflictException;
 import com.ego.raw_ego.common.exception.ResourceNotFoundException;
 import com.ego.raw_ego.common.util.SlugUtils;
@@ -580,15 +581,15 @@ public class CategoryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found: id=" + id));
 
         if (category.isActive()) {
-            throw new IllegalStateException(
+            throw new BusinessRuleViolationException(
                 "Category '" + category.getName() + "' is still active. Deactivate it first.");
         }
         if (productRepository.existsByCategory_Id(id)) {
-            throw new IllegalStateException(
+            throw new BusinessRuleViolationException(
                 "Category '" + category.getName() + "' has products. Reassign them first.");
         }
         if (categoryRepository.existsByParentId(id)) {
-            throw new IllegalStateException(
+            throw new BusinessRuleViolationException(
                 "Category '" + category.getName() + "' still has child categories. Remove them first.");
         }
 

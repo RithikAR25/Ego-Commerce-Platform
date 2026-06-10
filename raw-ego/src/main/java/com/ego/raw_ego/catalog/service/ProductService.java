@@ -10,6 +10,7 @@ import com.ego.raw_ego.catalog.enums.ProductStatus;
 import com.ego.raw_ego.catalog.event.ProductStockStatusChangedEvent;
 import com.ego.raw_ego.catalog.repository.ProductRepository;
 import com.ego.raw_ego.catalog.repository.ProductVariantRepository;
+import com.ego.raw_ego.common.exception.BusinessRuleViolationException;
 import com.ego.raw_ego.common.exception.ConflictException;
 import com.ego.raw_ego.common.exception.ResourceNotFoundException;
 import com.ego.raw_ego.common.util.SlugUtils;
@@ -348,6 +349,8 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: id=" + id));
     }
 
+    private static final int MAX_PRODUCT_CODE = 9999;
+
     /**
      * Generates the next zero-padded 4-digit product code.
      * MAX("0042") + 1 = "0043". If no products exist, starts at "0001".
@@ -355,8 +358,9 @@ public class ProductService {
     private String generateNextProductCode() {
         String maxCode = productRepository.findMaxProductCode().orElse("0000");
         int next = Integer.parseInt(maxCode) + 1;
-        if (next > 9999) {
-            throw new IllegalStateException("Product code limit reached (9999). Contact admin.");
+        if (next > MAX_PRODUCT_CODE) {
+            throw new BusinessRuleViolationException(
+                "Product code limit reached (" + MAX_PRODUCT_CODE + "). Contact the platform administrator.");
         }
         return String.format("%04d", next);
     }

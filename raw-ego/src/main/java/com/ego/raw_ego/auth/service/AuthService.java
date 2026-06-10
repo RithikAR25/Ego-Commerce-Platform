@@ -12,6 +12,8 @@ import com.ego.raw_ego.auth.repository.UserRepository;
 import com.ego.raw_ego.common.exception.AuthException;
 import com.ego.raw_ego.common.exception.ConflictException;
 import com.ego.raw_ego.notification.service.NotificationService;
+import io.jsonwebtoken.JwtException;
+import com.ego.raw_ego.common.util.LogMasker;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -72,7 +74,7 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request, HttpServletRequest httpRequest) {
         String normalizedEmail = request.getEmail().toLowerCase().trim();
-        log.info("Registration attempt: email={}", normalizedEmail);
+        log.info("Registration attempt: email={}", LogMasker.maskEmail(normalizedEmail));
 
         if (userRepository.existsByEmailAndDeletedFalse(normalizedEmail)) {
             throw new ConflictException("An account with this email address already exists.");
@@ -88,7 +90,7 @@ public class AuthService {
                 .build(); // Builder.Default handles: active=true, emailVerified=false, deleted=false, version=1
 
         user = userRepository.save(user);
-        log.info("User registered: id={} email={}", user.getId(), user.getEmail());
+        log.info("User registered: id={} email={}", user.getId(), LogMasker.maskEmail(user.getEmail()));
 
         // Send verification email asynchronously — never blocks the registration response.
         // The @Async annotation on sendVerificationEmail() runs this on ego-async-* thread pool.
@@ -114,24 +116,24 @@ public class AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         String normalizedEmail = request.getEmail().toLowerCase().trim();
-        log.info("Login attempt: email={}", normalizedEmail);
+        log.info("Login attempt: email={}", LogMasker.maskEmail(normalizedEmail));
 
         User user = userRepository.findByEmailAndDeletedFalse(normalizedEmail)
                 .orElseThrow(() -> new AuthException("Invalid email or password."));
 
         if (!user.isActive()) {
-            log.warn("Login attempt on deactivated account: email={}", normalizedEmail);
+            log.warn("Login attempt on deactivated account: email={}", LogMasker.maskEmail(normalizedEmail));
             throw new AuthException("Your account has been deactivated. Please contact support.");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            log.warn("Login failed — wrong password: email={}", normalizedEmail);
+            log.warn("Login failed — wrong password: email={}", LogMasker.maskEmail(normalizedEmail));
             throw new AuthException("Invalid email or password.");
         }
 
         // Non-version-bumping targeted update — avoids optimistic lock conflict
         userRepository.updateLastLoginAt(user.getId(), Instant.now());
-        log.info("Login successful: id={} email={}", user.getId(), user.getEmail());
+        log.info("Login successful: id={} email={}", user.getId(), LogMasker.maskEmail(user.getEmail()));
 
         return buildAuthResponse(user, null, httpRequest); // null = new family_id on each login
     }
@@ -153,7 +155,7 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse refreshToken(RefreshTokenRequest request, HttpServletRequest httpRequest) {
-        log.debug("Token rotation attempt");
+        log.info("Token rotation attempt");
 
         RefreshToken rotated = refreshTokenService.rotateRefreshToken(request.getRefreshToken());
         User user = rotated.getUser();
@@ -162,7 +164,7 @@ public class AuthService {
             throw new AuthException("Account is no longer active.");
         }
 
-        log.debug("Token rotated for user: email={}", user.getEmail());
+        log.info("Token rotated successfully for userId={}", user.getId());
         return buildAuthResponse(user, rotated.getFamilyId(), httpRequest);
     }
 
@@ -186,7 +188,7 @@ public class AuthService {
     @Transactional
     public void logout(String rawRefreshToken, String rawAccessToken) {
         refreshTokenService.revokeRefreshToken(rawRefreshToken);
-        log.debug("Logout: refresh token revoked");
+        log.info("Logout: refresh token revoked");
 
         // Blocklist the access token to prevent it being used after logout.
         // Non-fatal if rawAccessToken is null (e.g. client sent no Bearer header).
@@ -236,7 +238,8 @@ public class AuthService {
         String email;
         try {
             email = jwtService.verifyEmailToken(token);
-        } catch (Exception e) {
+        } catch (JwtException e) {
+            // Only catch JWT-specific parse/validation errors — not server-side errors
             log.warn("[Auth] Email verification token invalid: {}", e.getMessage());
             throw new AuthException("Invalid or expired verification link. Please request a new one.");
         }
@@ -323,18 +326,15 @@ public class AuthService {
         String email;
         try {
             email = jwtService.verifyPasswordResetToken(token);
-        } catch (Exception e) {
+        } catch (JwtException e) {
+            // Only catch JWT-specific parse/validation errors — not server-side errors
             log.warn("[Auth] Password reset token invalid: {}", e.getMessage());
             throw new AuthException("Invalid or expired password reset link. Please request a new one.");
         }
 
-        // Basic password validation
-        if (newPassword == null || newPassword.length() < 8) {
-            throw new AuthException("Password must be at least 8 characters long.");
-        }
-        if (!newPassword.matches(".*[0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*")) {
-            throw new AuthException("Password must contain at least one digit or special character.");
-        }
+        // Password complexity — same policy enforced by @Pattern on RegisterRequest:
+        // min 8 chars, at least one uppercase letter, one lowercase letter, one digit.
+        validatePasswordComplexity(newPassword);
 
         User user = userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> new AuthException("Account not found. Please register."));
@@ -371,5 +371,39 @@ public class AuthService {
                 jwtService.getAccessTokenExpiryMs() / 1000,
                 UserResponse.from(user)
         );
+    }
+    // ── Internal helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * Validates password complexity to match the policy enforced by
+     * {@link com.ego.raw_ego.auth.dto.request.RegisterRequest#password}.
+     *
+     * <p>Policy:
+     * <ul>
+     *   <li>Minimum 8 characters</li>
+     *   <li>At least one uppercase letter (A-Z)</li>
+     *   <li>At least one lowercase letter (a-z)</li>
+     *   <li>At least one digit (0-9)</li>
+     *   <li>Maximum 72 characters (BCrypt hard truncation limit)</li>
+     * </ul>
+     *
+     * @param newPassword the candidate password
+     * @throws AuthException if the policy is not satisfied
+     */
+    private void validatePasswordComplexity(String newPassword) {
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new AuthException("Password is required.");
+        }
+        if (newPassword.length() < 8) {
+            throw new AuthException("Password must be at least 8 characters long.");
+        }
+        if (newPassword.length() > 72) {
+            throw new AuthException("Password must not exceed 72 characters.");
+        }
+        // Same regex as RegisterRequest @Pattern:
+        if (!newPassword.matches("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).*$")) {
+            throw new AuthException(
+                "Password must contain at least one uppercase letter, one lowercase letter, and one number.");
+        }
     }
 }

@@ -4,6 +4,7 @@ import com.ego.raw_ego.auth.entity.RefreshToken;
 import com.ego.raw_ego.auth.entity.User;
 import com.ego.raw_ego.auth.repository.RefreshTokenRepository;
 import com.ego.raw_ego.common.exception.AuthException;
+import com.ego.raw_ego.common.util.LogMasker;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -82,7 +83,7 @@ public class RefreshTokenService {
                 .build();
 
         refreshTokenRepository.save(refreshToken);
-        log.debug("Refresh token created for user={} family={}", user.getEmail(), resolvedFamily);
+        log.debug("Refresh token created for userId={} family={}", user.getId(), resolvedFamily);
         return rawToken; // Return raw — service stores only the hash
     }
 
@@ -115,7 +116,8 @@ public class RefreshTokenService {
 
         if (existing.isRevoked()) {
             // ── REUSE DETECTED — possible token theft ──────────────────────────
-            log.warn("SECURITY: Refresh token reuse detected for family={}. Revoking all family tokens.",
+            log.error("SECURITY ALERT: Refresh token reuse detected for family={}. " +
+                    "Revoking entire session family as theft countermeasure.",
                     existing.getFamilyId());
             int revoked = refreshTokenRepository.revokeAllByFamilyId(
                     existing.getFamilyId(), Instant.now());
@@ -126,7 +128,7 @@ public class RefreshTokenService {
         }
 
         if (existing.isExpired()) {
-            log.debug("Refresh token expired for user={}", existing.getUser().getEmail());
+            log.info("Refresh token expired for email={}", LogMasker.maskEmail(existing.getUser().getEmail()));
             throw new AuthException("Session expired. Please log in again.");
         }
 
@@ -149,7 +151,8 @@ public class RefreshTokenService {
                 rt -> {
                     rt.setRevokedAt(Instant.now());
                     refreshTokenRepository.save(rt);
-                    log.debug("Refresh token revoked for user={}", rt.getUser().getEmail());
+                    log.info("Refresh token revoked (logout) for email={}",
+                            LogMasker.maskEmail(rt.getUser().getEmail()));
                 },
                 () -> log.debug("Logout: refresh token not found in DB — may have already been cleaned up")
         );

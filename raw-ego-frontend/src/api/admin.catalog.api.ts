@@ -331,7 +331,7 @@ export const adminUploadGalleryImage = async (productId: number, file: File, alt
   form.append('file', file);
   if (altText !== undefined) form.append('altText', altText);
   if (displayOrder !== undefined) form.append('displayOrder', String(displayOrder));
-  const { data } = await apiClient.post<ApiResponse<ImageResponse>>(`/admin/products/${productId}/images`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  const { data } = await apiClient.post<ApiResponse<ImageResponse>>(`/admin/products/${productId}/images`, form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 });
   return data.data;
 };
 
@@ -354,7 +354,7 @@ export const adminUploadVariantImage = async (productId: number, variantId: numb
   const { data } = await apiClient.post<ApiResponse<ImageResponse>>(
     `/admin/products/${productId}/variants/${variantId}/images`,
     form,
-    { headers: { 'Content-Type': 'multipart/form-data' } }
+    { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 }
   );
   return data.data;
 };

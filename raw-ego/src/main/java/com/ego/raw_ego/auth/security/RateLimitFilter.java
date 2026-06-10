@@ -1,5 +1,6 @@
 package com.ego.raw_ego.auth.security;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import jakarta.servlet.FilterChain;
@@ -14,7 +15,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * IP-based rate limiter for sensitive authentication endpoints.
@@ -23,18 +23,20 @@ import java.util.concurrent.ConcurrentHashMap;
  * <ul>
  *   <li>{@code POST /api/v1/auth/login}              — 5 attempts per 60 seconds per IP</li>
  *   <li>{@code POST /api/v1/auth/register}            — 3 attempts per 60 seconds per IP</li>
+ *   <li>{@code POST /api/v1/auth/forgot-password}     — 3 attempts per 5 minutes per IP</li>
  *   <li>{@code POST /api/v1/auth/resend-verification} — 3 attempts per 60 minutes per IP</li>
  * </ul>
  *
  * <h3>Implementation</h3>
- * <p>Uses Bucket4j with an in-memory {@link ConcurrentHashMap} keyed by
- * {@code (IP + endpoint)} for per-endpoint isolation. No external infrastructure
- * (Redis, database) is required — the buckets live in JVM heap.
+ * <p>Uses Bucket4j with a Caffeine cache keyed by {@code (IP + endpoint)} for
+ * per-endpoint isolation. Caffeine evicts idle entries after 10 minutes to prevent
+ * unbounded heap growth on long-running instances (P1-5 fix: replaced plain
+ * {@link java.util.concurrent.ConcurrentHashMap} which had no eviction).
  *
  * <p>Trade-off: In-memory buckets are per-instance only. If the application scales
  * horizontally to multiple JVM instances, rate limits will be per-pod rather than
  * global. For a single-instance deployment (Railway free tier), this is acceptable.
- * Upgrade path: replace the {@code ConcurrentHashMap} with a
+ * Upgrade path: replace the Caffeine cache with a
  * {@code BucketProxyManager} backed by Upstash Redis for distributed limiting.
  *
  * <h3>Response on rate limit exceeded</h3>
@@ -48,11 +50,19 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     // Separate buckets per (IP + endpoint path) to prevent one endpoint's
     // exhaustion from blocking the other.
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+    //
+    // Caffeine evicts entries that have not been accessed for 10 minutes.
+    // This prevents unbounded heap growth from unique IPs over long uptimes.
+    // The 10-minute window is safely above all rate-limit windows (max: 60 min).
+    private final Map<String, Bucket> buckets = Caffeine.newBuilder()
+            .expireAfterAccess(Duration.ofMinutes(10))
+            .<String, Bucket>build()
+            .asMap();
 
     private static final String LOGIN_PATH               = "/api/v1/auth/login";
     private static final String REGISTER_PATH             = "/api/v1/auth/register";
-    private static final String RESEND_VERIFICATION_PATH = "/api/v1/auth/resend-verification";
+    private static final String FORGOT_PASSWORD_PATH      = "/api/v1/auth/forgot-password";
+    private static final String RESEND_VERIFICATION_PATH  = "/api/v1/auth/resend-verification";
 
     @Override
     protected void doFilterInternal(
@@ -68,6 +78,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if ("POST".equalsIgnoreCase(method)
                 && (LOGIN_PATH.equals(path)
                         || REGISTER_PATH.equals(path)
+                        || FORGOT_PASSWORD_PATH.equals(path)
                         || RESEND_VERIFICATION_PATH.equals(path))) {
 
             String clientIp  = resolveClientIp(request);
@@ -92,6 +103,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
      * <ul>
      *   <li>Login:               5 tokens, refill 5 per 60 seconds</li>
      *   <li>Register:            3 tokens, refill 3 per 60 seconds</li>
+     *   <li>Forgot-password:     3 tokens, refill 3 per 5 minutes (unauthenticated — abuse risk)</li>
      *   <li>Resend-verification: 3 tokens, refill 3 per 60 minutes</li>
      * </ul>
      */
@@ -101,6 +113,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             bandwidth = Bandwidth.simple(5, Duration.ofSeconds(60));    // 5 logins / min
         } else if (RESEND_VERIFICATION_PATH.equals(path)) {
             bandwidth = Bandwidth.simple(3, Duration.ofMinutes(60));    // 3 resend-verif / hour
+        } else if (FORGOT_PASSWORD_PATH.equals(path)) {
+            bandwidth = Bandwidth.simple(3, Duration.ofMinutes(5));     // 3 reset requests / 5 min
         } else {
             bandwidth = Bandwidth.simple(3, Duration.ofSeconds(60));    // 3 registrations / min
         }
@@ -112,7 +126,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     /**
      * Resolves the real client IP, respecting X-Forwarded-For for clients
-     * behind load balancers and reverse proxies (Railway, Vercel).
+     * behind load balancers and reverse proxies (Railway, Nginx).
+     *
+     * <p>Note: {@code server.forward-headers-strategy=FRAMEWORK} in {@code application.properties}
+     * ensures this header is only populated by trusted proxies. Direct-client spoofing is prevented
+     * at the Spring Boot layer before reaching this filter.
      */
     private String resolveClientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
@@ -137,6 +155,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             message = "Too many login attempts. Please wait 60 seconds before trying again.";
         } else if (RESEND_VERIFICATION_PATH.equals(path)) {
             message = "Too many verification email requests. Please wait 60 minutes before trying again.";
+        } else if (FORGOT_PASSWORD_PATH.equals(path)) {
+            message = "Too many password reset requests. Please wait 5 minutes before trying again.";
         } else {
             message = "Too many registration attempts. Please wait 60 seconds before trying again.";
         }

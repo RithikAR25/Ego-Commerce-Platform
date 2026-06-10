@@ -5,6 +5,7 @@ import com.ego.raw_ego.common.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -24,6 +25,7 @@ import java.util.List;
  *   <li>{@link IllegalArgumentException}               — bad business rule input → 400</li>
  *   <li>{@link EgoException} (and subclasses)          — domain errors → their status</li>
  *   <li>{@link DataIntegrityViolationException}        — DB unique/FK constraint → 409</li>
+ *   <li>{@link OptimisticLockingFailureException}      — concurrent write collision → 409</li>
  *   <li>{@link AuthenticationException}                — Spring Security auth failures → 401</li>
  *   <li>{@link AccessDeniedException}                  — Spring Security authz failures → 403</li>
  *   <li>{@link Exception}                              — unexpected errors → 500</li>
@@ -111,6 +113,21 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error("Access denied. You do not have permission to perform this action."));
+    }
+
+    // ── Optimistic locking collision (409) ───────────────────────────────────
+    //
+    // Thrown by Spring Data when two concurrent requests modify the same @Version-tracked
+    // entity (Order, Product, ProductVariant, InventoryRecord). This is EXPECTED behaviour
+    // — not a server error. The client should refresh and retry the operation.
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOptimisticLocking(OptimisticLockingFailureException ex) {
+        log.warn("Optimistic locking conflict on [{}]: {}", ex.getClass().getSimpleName(), ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(
+                        "This resource was modified by another request. Please refresh and try again."));
     }
 
     // ── Catch-all (500) ───────────────────────────────────────────────────────
