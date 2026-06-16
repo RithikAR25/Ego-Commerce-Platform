@@ -117,7 +117,7 @@ All three run as Docker containers.
 
 ```bash
 # MySQL 8 — runs on port 3307 (intentionally not 3306, to avoid conflicts with any local MySQL install)
-docker run -d --name ego-mysql \
+docker run -d --name rawego \
   -e MYSQL_ROOT_PASSWORD=root \
   -e MYSQL_DATABASE=rawego \
   -p 3307:3306 \
@@ -151,7 +151,7 @@ You should see output with **three running containers:**
 
 ```
 CONTAINER ID   IMAGE                                     ...   NAMES
-xxxxxxxxxxxx   mysql:8.0                                 ...   ego-mysql
+xxxxxxxxxxxx   mysql:8.0                                 ...   rawego
 xxxxxxxxxxxx   redis:7-alpine                            ...   ego-redis
 xxxxxxxxxxxx   elasticsearch/elasticsearch:9.0.1        ...   ego-elasticsearch
 ```
@@ -261,9 +261,15 @@ VITE_RAZORPAY_KEY_ID=rzp_test_your_key_id
 
 ### Why this step is needed
 
-The MySQL Docker container starts with an **empty database**. The database has no tables and no data yet.
-This step imports the schema (all table definitions) and seed data (categories, products) into the
-running MySQL container.
+The `rawego` MySQL container starts with an **empty database** — no tables, no data.
+This step imports two files into the running container:
+
+| File | What it contains |
+|---|---|
+| `schema_v2.sql` | All table definitions (schema only, no data) |
+| `seed_data.sql` | Full dataset — products, categories, users, inventory, orders, and more |
+
+Run these **in order** (schema must exist before data can be inserted).
 
 ### What is the MySQL Client (`mysql`) and why do you need it?
 
@@ -286,17 +292,14 @@ If you followed this guide and only installed Docker (not MySQL locally), you li
 Docker lets you run the `mysql` client *inside* the already-running container, without installing
 anything on your machine.
 
-Run these three commands from the **project root** (`EGO_E-commerce/`):
+Run these **two commands** from the **project root** (`EGO_E-commerce/`):
 
 ```bash
-# 1. Import the database schema (creates all tables)
-docker exec -i ego-mysql mysql -u root -proot rawego < docs/06-database/schema_v2.sql
+# 1. Create all tables (schema)
+docker exec -i rawego mysql -u root -proot rawego < docs/06-database/schema_v2.sql
 
-# 2. Seed categories (3-level hierarchy: Men, Women, etc.)
-docker exec -i ego-mysql mysql -u root -proot rawego < docs/06-database/01_category_seed.sql
-
-# 3. Seed products (catalog data with variants and images)
-docker exec -i ego-mysql mysql -u root -proot rawego < docs/06-database/02_product_seed.sql
+# 2. Load the full dataset (products, categories, users, inventory, orders…)
+docker exec -i rawego mysql -u root -proot rawego < docs/06-database/seed_data.sql
 ```
 
 > **Windows PowerShell note:** The `<` redirect operator may not work in PowerShell for piping files to Docker.
@@ -321,11 +324,13 @@ If you prefer having the `mysql` command available globally on your machine:
    ```
    Expected: `mysql  Ver 8.0.x ...`
 
-6. Now run the seed commands from the **project root** (`EGO_E-commerce/`):
+6. Now run the two seed commands from the **project root** (`EGO_E-commerce/`):
    ```bash
+   # 1. Create all tables (schema)
    mysql -u root -proot -h 127.0.0.1 -P 3307 rawego < docs/06-database/schema_v2.sql
-   mysql -u root -proot -h 127.0.0.1 -P 3307 rawego < docs/06-database/01_category_seed.sql
-   mysql -u root -proot -h 127.0.0.1 -P 3307 rawego < docs/06-database/02_product_seed.sql
+
+   # 2. Load the full dataset
+   mysql -u root -proot -h 127.0.0.1 -P 3307 rawego < docs/06-database/seed_data.sql
    ```
 
 ---
@@ -333,10 +338,10 @@ If you prefer having the `mysql` command available globally on your machine:
 **✅ Verify seeding worked:**
 
 ```bash
-docker exec -it ego-mysql mysql -u root -proot rawego -e "SHOW TABLES;"
+docker exec -it rawego mysql -u root -proot rawego -e "SHOW TABLES;"
 ```
 
-You should see a list of table names (e.g., `users`, `products`, `categories`, `orders`...).
+You should see **23 tables** listed (e.g., `users`, `products`, `categories`, `orders`...).
 If you see an empty list or an error, re-run the seed commands above.
 
 ---
@@ -456,7 +461,7 @@ If something goes wrong, see the full troubleshooting guide:
 
 | Error | Likely Cause | Fix |
 |---|---|---|
-| `Connection refused: localhost:3306` | MySQL container not running | Run `docker ps`, restart `ego-mysql` |
+| `Connection refused: localhost:3306` | MySQL container not running | Run `docker ps`, restart `rawego` container |
 | `RedisConnectionFailureException` | Redis container not running | Run `docker ps`, restart `ego-redis` |
 | Elasticsearch connection refused | ES container down or not ready yet | Wait 60 seconds, then restart backend |
 | `'mysql' is not recognized` | MySQL CLI not installed | Use Option A (docker exec) in Step 4 |
