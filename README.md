@@ -54,27 +54,20 @@
 
 ## 🚀 Getting Started
 
-Want to run EGO locally? It takes less than 5 minutes using Docker.
+The complete local development guide is here:
 
-### Environment Configuration
+**➡️ [docs/01-getting-started/local-development.md](docs/01-getting-started/local-development.md)**
 
-Before starting the application, check whether the required environment file already exists:
+The guide covers, step by step:
+1. Installing Java 21, Node.js 20, and Docker Desktop (with download links and verification)
+2. Starting MySQL, Redis, and Elasticsearch via Docker
+3. Configuring environment variables (`.env` + `.env.local`)
+4. Seeding the database (works without a local MySQL install)
+5. Starting the Spring Boot backend (terminal + IntelliJ IDEA options)
+6. Syncing the Elasticsearch index
+7. Starting the React frontend
 
-**Backend:**
-* If `.env` exists, use it.
-* Otherwise create `.env` from `.env.example` and populate the required values.
-
-**Frontend:**
-* If `.env.local` exists, use it.
-* Otherwise create `.env.local` from `.env.example` and populate the required values.
-
-If environment files have already been provided, place them in the appropriate project directories and proceed to the next step. Otherwise, create them from the provided `.env.example` templates.
-
-### Guides
-
-1. **[Local Development Setup Guide](docs/01-getting-started/local-development.md)** — Step-by-step instructions for booting the MySQL/Redis/ES containers and starting the applications.
-2. **[Backend README](raw-ego/README.md)** — Backend-specific build and test instructions.
-3. **[Frontend README](raw-ego-frontend/README.md)** — Frontend-specific dev server and linting instructions.
+> **Time estimate:** ~20–30 minutes on a fresh machine.
 
 ---
 

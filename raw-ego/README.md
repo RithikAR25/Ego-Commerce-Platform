@@ -77,19 +77,64 @@ JWT_SECRET=paste_your_generated_key_here
 
 ### 3. Seed the Database
 
-Before starting the backend, seed the initial database schema and test data:
+The Docker MySQL container starts completely empty. These commands import the schema
+(table definitions) and seed data into the running container.
 
+> **Why `docker exec`?** The `mysql` command-line client is not bundled with Docker —
+> it comes with a full MySQL Server install. If you only installed Docker (recommended),
+> use `docker exec` to run the client *inside* the already-running container instead.
+>
+> Run all commands from the **project root** (`EGO_E-commerce/`):
+
+**macOS / Linux / Git Bash (Windows):**
 ```bash
-mysql -u root -proot -h 127.0.0.1 -P 3307 rawego < ../docs/database/schema_v2.sql
-mysql -u root -proot -h 127.0.0.1 -P 3307 rawego < ../docs/database/01_category_seed.sql
-mysql -u root -proot -h 127.0.0.1 -P 3307 rawego < ../docs/database/02_product_seed.sql
+# 1. Import schema (all table definitions)
+docker exec -i ego-mysql mysql -u root -proot rawego < docs/06-database/schema_v2.sql
+
+# 2. Seed categories
+docker exec -i ego-mysql mysql -u root -proot rawego < docs/06-database/01_category_seed.sql
+
+# 3. Seed products
+docker exec -i ego-mysql mysql -u root -proot rawego < docs/06-database/02_product_seed.sql
 ```
+
+**Windows PowerShell** (the `<` redirect does not work in PowerShell — use `Get-Content` instead):
+```powershell
+Get-Content docs\06-database\schema_v2.sql          | docker exec -i ego-mysql mysql -u root -proot rawego
+Get-Content docs\06-database\01_category_seed.sql    | docker exec -i ego-mysql mysql -u root -proot rawego
+Get-Content docs\06-database\02_product_seed.sql     | docker exec -i ego-mysql mysql -u root -proot rawego
+```
+
+> **Verify seeding worked:**
+> ```bash
+> docker exec -it ego-mysql mysql -u root -proot rawego -e "SHOW TABLES;"
+> ```
+> You should see a list of table names (`users`, `products`, `categories`, `orders`...).
+> If the list is empty, re-run the seed commands above.
 
 ### 4. Run the Application
 
+**macOS / Linux / Git Bash:**
 ```bash
+cd raw-ego
 ./mvnw spring-boot:run
 ```
+
+**Windows — PowerShell or Command Prompt:**
+```powershell
+cd raw-ego
+.\mvnw.cmd spring-boot:run
+```
+
+> `mvnw` / `mvnw.cmd` is the **Maven Wrapper** — a script bundled with the project that
+> downloads the correct Maven version automatically. You do **not** need to install Maven.
+
+**Alternative — Run from IntelliJ IDEA (Recommended for development):**
+1. Download [IntelliJ IDEA Community Edition](https://www.jetbrains.com/idea/download/) (free).
+2. Open IntelliJ → **Open** → select the `raw-ego/` folder.
+3. Wait for Maven import and indexing to complete.
+4. Open `RawEgoApplication.java` → click the green **Run ▶** button.
+5. Install the **EnvFile** plugin (**File → Settings → Plugins → search "EnvFile"**) and point it to `raw-ego/.env` in the Run Configuration so the app reads your credentials.
 
 The API will be available at `http://localhost:8080`.
 
@@ -98,11 +143,18 @@ The API will be available at `http://localhost:8080`.
 ## 📖 API Documentation (Swagger)
 
 The backend auto-generates OpenAPI 3.0 documentation using Springdoc.
-Once the server is running, visit:
+
+> **Swagger is disabled by default** to prevent API exposure in production.
+> To enable it locally, add this to your `raw-ego/.env` file:
+> ```env
+> SWAGGER_ENABLED=true
+> ```
+
+Once the server is running with `SWAGGER_ENABLED=true`, visit:
 
 **[http://localhost:8080/docs](http://localhost:8080/docs)**
 
-From the Swagger UI, you can authenticate via the `POST /api/v1/auth/login` endpoint and easily test protected endpoints by clicking the **Authorize** lock icon.
+From Swagger UI, authenticate via `POST /api/v1/auth/login` and click the **Authorize 🔒** lock icon to test protected endpoints.
 
 ---
 

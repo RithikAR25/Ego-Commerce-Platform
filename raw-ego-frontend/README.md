@@ -25,15 +25,34 @@ This is the React Vite frontend for the EGO E-Commerce platform. It contains a u
 
 ### 1. Environment Configuration
 
-Before starting the application, check whether the required environment file already exists:
-* If `.env.local` exists, use it.
-* Otherwise create `.env.local` from `.env.example` and populate the required values.
+From the **`raw-ego-frontend/` folder**, create your local environment file:
 
-If environment files have already been provided, place them in the appropriate project directories and proceed to the next step. Otherwise, create them from the provided `.env.example` templates:
-
+**macOS / Linux / Git Bash:**
 ```bash
 cp .env.example .env.local
 ```
+
+**Windows PowerShell:**
+```powershell
+Copy-Item .env.example .env.local
+```
+
+Open `.env.local` in any text editor. It should contain the following (the defaults work for local development):
+
+```env
+# URL of the backend API — do not change this for local development
+VITE_API_BASE_URL=http://localhost:8080/api/v1
+
+# Your Cloudinary cloud name — needed for product image display
+# Get from: https://cloudinary.com/console (top-left of the dashboard)
+VITE_CLOUDINARY_CLOUD_NAME=your-cloudinary-cloud-name
+
+# Your Razorpay test key — needed for the checkout flow
+# Get from: https://dashboard.razorpay.com/app/keys (use the Test mode key)
+VITE_RAZORPAY_KEY_ID=rzp_test_your_key_id
+```
+
+> The app will run without Cloudinary and Razorpay keys, but product images and payments will not work.
 
 ### 2. Install Dependencies
 ```bash
