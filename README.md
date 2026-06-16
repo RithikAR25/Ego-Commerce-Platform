@@ -1,7 +1,5 @@
 # EGO — Premium D2C Streetwear Platform
 
-![EGO Platform Overview](docs/diagrams/placeholder-hero-image.png)
-
 > _An end-to-end, high-performance e-commerce platform built for scale, speed, and visual excellence._
 
 **EGO** is a full-stack, direct-to-consumer (D2C) streetwear retail platform. It features a modern, stateless architecture designed to handle high-concurrency inventory drops, complex product variants, and instant faceted search.
