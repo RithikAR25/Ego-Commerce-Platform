@@ -15,6 +15,7 @@ Before generating code or suggesting modifications, you must read the persistent
 3. **`TECH_STACK.md`:** Know the exact framework versions and libraries available.
 4. **`ARCHITECTURE_RULES.md` & `IMPLEMENTATION_RULES.md`:** Adhere to the code quality rules.
 5. **`TODO_NEXT_PHASE.md`:** Read the implementation steps for the current target phase.
+6. **`PATTERNS_LIBRARY.md`:** *(Optional but recommended)* Maps every reusable pattern in EGO to its source file and the corresponding general standard in `dev-standards`. Read this when you need to understand *why* a pattern exists or find a specific implementation.
 
 ---
 
