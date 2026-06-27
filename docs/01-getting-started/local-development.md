@@ -307,6 +307,52 @@ docker exec -i rawego mysql -u root -proot rawego < docs/06-database/seed_data.s
 
 ---
 
+#### ⚠️ Troubleshooting: `ERROR: ASCII '\0' appeared in the statement`
+
+If you run the seed command and see an error like this:
+
+```
+ERROR: ASCII '\0' appeared in the statement, but this is not allowed unless option --binary-mode is enabled...
+```
+
+**This is not caused by Docker or MySQL.** It is caused by the **SQL file encoding**.
+
+The key part of the error — `ASCII '\0' appeared in the statement` — almost always means the `.sql` file
+is saved as **UTF-16** (or another Unicode encoding that includes null bytes), while the MySQL client
+expects **UTF-8** or **ASCII**.
+
+##### Step 1 — Verify the file encoding
+
+In **Git Bash**, run:
+
+```bash
+file docs/06-database/schema_v2.sql
+```
+
+If the output shows something like:
+
+```
+docs/06-database/schema_v2.sql: UTF-16 Unicode text
+```
+
+then that is the problem.
+
+##### Step 2 — Fix: Convert the file to UTF-8 (Recommended)
+
+**In VS Code:**
+
+1. Open `docs/06-database/schema_v2.sql`.
+2. Look at the **bottom-right corner** of the editor. If it shows `UTF-16 LE`, click it.
+3. A command palette menu will appear — choose **"Save with Encoding"**.
+4. Select **UTF-8**.
+5. Save the file.
+
+After saving, re-run the seed commands above. The error will not occur again.
+
+> Do the same for `seed_data.sql` if you see the same error when running the second command.
+
+---
+
 #### Option B — Install the MySQL Client Separately
 
 If you prefer having the `mysql` command available globally on your machine:
@@ -335,14 +381,59 @@ If you prefer having the `mysql` command available globally on your machine:
 
 ---
 
-**✅ Verify seeding worked:**
+**✅ Verify the database**
+
+Run the following command to check that all tables were created:
 
 ```bash
 docker exec -it rawego mysql -u root -proot rawego -e "SHOW TABLES;"
 ```
 
-You should see **23 tables** listed (e.g., `users`, `products`, `categories`, `orders`...).
-If you see an empty list or an error, re-run the seed commands above.
+You should see a list of tables, for example:
+
+```
+categories
+products
+users
+orders
+...
+```
+
+The documentation mentions around **23 tables** in total.
+
+**Optional — Count the tables exactly:**
+
+```bash
+docker exec -it rawego mysql -u root -proot rawego -e "SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema='rawego';"
+```
+
+Expected output:
+
+```
++-------------+
+| table_count |
++-------------+
+|          23 |
++-------------+
+```
+
+If it returns `23`, the schema import is complete.
+
+**✅ Verify that data was seeded**
+
+Check that the seed data was loaded by confirming the row counts are greater than 0:
+
+```bash
+docker exec -it rawego mysql -u root -proot rawego -e "SELECT COUNT(*) FROM products;"
+```
+
+```bash
+docker exec -it rawego mysql -u root -proot rawego -e "SELECT COUNT(*) FROM users;"
+```
+
+If both return counts **greater than 0**, your seed data was imported successfully.
+
+> If you see `0` rows or an error, re-run the seed commands above starting with `schema_v2.sql`, then `seed_data.sql`.
 
 ---
 
